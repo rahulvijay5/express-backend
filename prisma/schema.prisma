@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  phoneNumber   String?   @unique
+  role          UserRole  @default(GUEST)
+  image         String?
+  emailVerified DateTime?
+  aadharCard    AadharCard?
+  hotels        Hotel[]   @relation("HotelOwner")
+  managedHotels Hotel[]   @relation("HotelManager")
+  bookings      Booking[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Hotel {
+  id            String    @id @default(uuid())
+  name          String
+  location      String
+  description   String
+  hotelCode     String    @unique @db.Char(4)
+  images        String[]
+  rules         Json?     // Hotel specific rules
+  rooms         Room[]
+  ownerId       String
+  owner         User      @relation("HotelOwner", fields: [ownerId], references: [id])
+  managers      User[]    @relation("HotelManager")
+  bookings      Booking[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([hotelCode])
+}
+
+model Room {
+  id          String    @id @default(uuid())
+  roomNumber  String
+  roomCode    String    @unique @db.Char(6)
+  type        RoomType
+  price       Float
+  capacity    Int
+  amenities   String[]
+  images      String[]
+  status      RoomStatus @default(AVAILABLE)
+  hotelId     String
+  hotel       Hotel     @relation(fields: [hotelId], references: [id])
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([hotelId, roomNumber])
+  @@index([roomCode])
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  hotelId       String
+  hotel         Hotel         @relation(fields: [hotelId], references: [id])
+  roomId        String
+  room          Room          @relation(fields: [roomId], references: [id])
+  checkIn       DateTime
+  checkOut      DateTime
+  status        BookingStatus @default(PENDING)
+  totalAmount   Float
+  paymentStatus PaymentStatus @default(PENDING)
+  members       Json          // Array of family members
+  documents     Json?         // Additional documents
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([hotelId])
+  @@index([roomId])
+}
+
+model AadharCard {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  documentPath  String   // Encrypted document path in R2
+  encryptionKey String   // Encrypted key stored separately
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  OWNER
+  MANAGER
+  GUEST
+}
+
+enum RoomType {
+  STANDARD
+  DELUXE
+  SUITE
+  PRESIDENTIAL
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
